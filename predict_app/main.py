@@ -3,6 +3,7 @@ from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
 import plotly
+import plotly.graph_objs as go
 
 import requests
 import calendar
@@ -11,7 +12,6 @@ import math
 import pandas as pd
 
 from river import metrics, utils, compose, linear_model, preprocessing, optim
-import plotly.express as px
 
 def get_month(x):
     return {
@@ -27,7 +27,13 @@ def get_month_distances(x):
         for month in range(1, 13)
     }
 
-fig = plotly.tools.make_subplots(rows=1, cols=1, vertical_spacing=0.2)
+fig = dict(
+    data=[{'x': [], 'y': []}], 
+    layout=dict(
+        xaxis=dict(range=[]), 
+        yaxis=dict(range=[])
+        )
+    )
 metric = utils.Rolling(metrics.RMSE(), window_size=600)
 model = compose.Pipeline(
     ('features', compose.TransformerUnion(
@@ -43,6 +49,10 @@ model = compose.Pipeline(
 )
 
 model = preprocessing.TargetStandardScaler(regressor=model)
+df = {
+    'ETHUSDT':{'datetime':[], 'price':[], 'predicted':[], 'rmse':[]},
+    'BTCUSDT':{'datetime':[], 'price':[], 'predicted':[], 'rmse':[]},
+      }
 
 app = Dash(
     title='BITCOIN PRED',
@@ -73,7 +83,7 @@ app.layout = dbc.Container([
         html.Br(), html.Br(),
         dcc.Dropdown([
                     {
-                        "label": html.Span("ETH-USDT", 
+                        "label": html.Span("ETH:USDT", 
                                            style={'font-size': 10, 
                                                   'padding-left': 10,
                                                   }
@@ -81,7 +91,7 @@ app.layout = dbc.Container([
                         "value": "ETHUSDT",
                     },
                     {
-                        "label": html.Span("BTC-USDT", 
+                        "label": html.Span("BTC:USDT", 
                                            style={'font-size': 10, 
                                                   'padding-left': 10,
                                                   }
@@ -117,13 +127,15 @@ app.layout = dbc.Container([
                             }
                         ),
                 html.Br(), html.Br(),
-                html.Div([dcc.Graph(id='graph', figure=fig)], 
+                html.Div([dcc.Graph(id='graph', figure=fig),
+                          dcc.Store(id='storage-df', storage_type='memory')
+                          ], 
                           style={
                             'margin': '10px',
                             'border-radius': '10px',
                             }
                             ),
-                dcc.Interval(id="interval", interval=1*1000, max_intervals=35), # max_intervals = -1 : infinity, 0 : stop
+                dcc.Interval(id="interval", interval=1*1000, max_intervals=-1), # max_intervals = -1 : infinity, 0 : stop
                 html.Br(), html.Br(),
                 dbc.Row([
                 dbc.Col([
@@ -131,6 +143,16 @@ app.layout = dbc.Container([
                                     #  color="white",
                                     #  text_color="warning" ,
                                      className="btn btn-secondary disabled"),
+                    html.Br(), html.Br(),
+                    html.Span("current interval", 
+                            className="form-label mt-4",
+                            style={'font-size': 12}
+                            ),
+                    html.Br(), html.Br(),
+                    dbc.Badge("count : 0", 
+                                    #  color="white",
+                                    #  text_color="warning" ,
+                                     className="btn btn-secondary disabled", id='main-interval'),
                         ], width = 4 ,
                             style={
                             'textAlign': 'center',
@@ -220,19 +242,23 @@ def on_button_click(n):
     
 @app.callback(
     Output("cardhead", "children"),
+    Output("main-interval", "children"),
     Output("n_itv1", "children"),
     Output("n_itv2", "children"),
-    Output("graph", "figure"),
+    Output("storage-df", "data"),
+    Output('interval', 'max_intervals'),
     [
         Input("choice0", "value"),
-        Input('interval', 'n_intervals')
+        Input('interval', 'n_intervals'),
      ]
 )
 def on_button_click(coin, interval):
-    df = { 'datetime':[], 'price':[], 'predicted':[] }
+    
     if coin is None :
-        raise dash.exceptions.PreventUpdate
+        max_intervals = 0
+        # raise dash.exceptions.PreventUpdate
     else:
+        max_intervals = -1
         key = "https://api.binance.com/api/v3/ticker?symbol="+coin
         data = requests.get(key).json()
 
@@ -247,32 +273,47 @@ def on_button_click(coin, interval):
 
         my_datetime = dt.datetime.fromtimestamp(data['closeTime'] / 1000)
 
-        df['datetime'].append(my_datetime)
-        df['price'].append(price)
-        df['predicted'].append(y_pred)
+        if (y_pred != 0) :
+            df[coin]['datetime'].append(my_datetime)
+            df[coin]['price'].append(price)
+            df[coin]['predicted'].append(y_pred)
+            df[coin]['rmse'].append(0)
+        else : 
+            # raise dash.exceptions.PreventUpdate
+            pass
 
-        df = pd.DataFrame(df)
-        # print("\n\n"); print(df)
+    return f'{coin}', f'count : {interval}', f'number of interval : {interval}', f'number of interval : {interval-1}', df , max_intervals
 
-        fig = plotly.tools.make_subplots(rows=1, cols=1, vertical_spacing=0.2)
-        
-        fig.append_trace({
-                'x': df['datetime'],
-                'y': df['price'],
-                'name': 'Price',
-                'mode': 'lines+markers',
-                'type': 'scatter'
-            }, row=1, col=1)
-        fig.append_trace({
-                'x': df['datetime'],
-                'y': df['predicted'],
-                'name': 'Predicted',
-                'mode': 'lines+markers',
-                'type': 'scatter'
-            }, row=1, col=1)
+@app.callback(
+    Output("graph", "figure"), 
+    [
+        Input('interval', 'max_intervals'), 
+        Input('storage-df', 'data'),
+        Input("choice0", "value"),
+     ]
+)
+def on_button_click(max_intervals, df, coin):
+    if ((coin is None) or (df is None)) or (max_intervals == 0):
+        raise dash.exceptions.PreventUpdate
+    elif (max_intervals == -1) :
+        df = pd.DataFrame( data = df[coin] )
 
-    return f'{coin}', f'number of interval : {interval}', f'number of interval : {interval-1}', fig
+        df = [
+            go.Scatter(
+                x=df['datetime'],
+                y=df['price'],
+                name='price',
+                mode= 'lines+markers',
+            ),
+            go.Scatter(
+                x=df['datetime'],
+                y=df['predicted'],
+                name='predicted',
+                mode= 'lines+markers'
+            ),
+            ]
 
+    return {'data': df, "layout": {"title": {"text": coin}} }
 
 if __name__ == '__main__':
     app.run(debug=True)
