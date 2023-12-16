@@ -1,8 +1,12 @@
+# Dash version : 2.10.2
+# Plotly version : 5.9.0
+# Pandas version : 2.0.3
+# River version : 0.18.0
+
 import dash
 from dash import Dash, html, dcc
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output
-import plotly
 import plotly.graph_objs as go
 
 import requests
@@ -34,7 +38,7 @@ fig = dict(
         yaxis=dict(range=[])
         )
     )
-metric = utils.Rolling(metrics.RMSE(), window_size=600)
+
 model = compose.Pipeline(
     ('features', compose.TransformerUnion(
         ('ordinal_date', compose.FuncTransformer(get_ordinal_date)),
@@ -50,8 +54,8 @@ model = compose.Pipeline(
 
 model = preprocessing.TargetStandardScaler(regressor=model)
 df = {
-    'ETHUSDT':{'datetime':[], 'price':[], 'predicted':[], 'rmse':[]},
-    'BTCUSDT':{'datetime':[], 'price':[], 'predicted':[], 'rmse':[]},
+    'ETHUSDT':{'datetime':[], 'price':[], 'predicted':[]},
+    'BTCUSDT':{'datetime':[], 'price':[], 'predicted':[]},
       }
 
 app = Dash(
@@ -84,17 +88,13 @@ app.layout = dbc.Container([
         dcc.Dropdown([
                     {
                         "label": html.Span("ETH:USDT", 
-                                           style={'font-size': 10, 
-                                                  'padding-left': 10,
-                                                  }
+                                           style={'font-size': 10,}
                                            ),
                         "value": "ETHUSDT",
                     },
                     {
                         "label": html.Span("BTC:USDT", 
-                                           style={'font-size': 10, 
-                                                  'padding-left': 10,
-                                                  }
+                                           style={'font-size': 10,}
                                            ),
                         "value": "BTCUSDT",
                         "disabled":False,
@@ -102,8 +102,20 @@ app.layout = dbc.Container([
                     id='choice0',
                     style = {
                                 'border-radius': '15px',
-                                'textAlign': 'center',
                              }
+                    ),
+        html.Br(), html.Br(),
+        dcc.Input(id="input1", type="number", placeholder="number of seconds",
+                  className="form-control form-control-sm", 
+                  style={
+                        'border-radius': '15px',
+                        'textAlign': 'center',
+                        }),
+        html.Br(), html.Br(),
+        html.Span("RMSE score will compute every 0 minutes 0 seconds", 
+                    className="form-label mt-4",
+                    id='text_compute',
+                    style={'font-size': 12},
                     ),
         html.Br(), html.Br(),
     ], 
@@ -124,9 +136,9 @@ app.layout = dbc.Container([
                             'textAlign': 'center',
                             'margin': '10px',
                             'border-radius': '10px',
+                            'font-size': 14
                             }
                         ),
-                html.Br(), html.Br(),
                 html.Div([dcc.Graph(id='graph', figure=fig),
                           dcc.Store(id='storage-df', storage_type='memory')
                           ], 
@@ -136,7 +148,7 @@ app.layout = dbc.Container([
                             }
                             ),
                 dcc.Interval(id="interval", interval=1*1000, max_intervals=-1), # max_intervals = -1 : infinity, 0 : stop
-                html.Br(), html.Br(),
+                # html.Br(), # before details below the graph
                 dbc.Row([
                 dbc.Col([
                     dbc.Badge("RMSE", 
@@ -144,7 +156,7 @@ app.layout = dbc.Container([
                                     #  text_color="warning" ,
                                      className="btn btn-secondary disabled"),
                     html.Br(), html.Br(),
-                    html.Span("current interval", 
+                    html.Span("current interval ( seconds )", 
                             className="form-label mt-4",
                             style={'font-size': 12}
                             ),
@@ -163,34 +175,55 @@ app.layout = dbc.Container([
                             },
                         ),
                 dbc.Col([
+                    html.Br(),
                     dbc.ListGroup([
                         dbc.ListGroupItem([
                                     html.Div(
                                         [
-                                            html.P("RMSE : 0", className="mb-1",id='rmse1'),
-                                            html.Small("Yay!", className="text-success", id='qual0'),
+                                            html.P("RMSE : 0", className="mb-1",id='rmse1',
+                                                   style={'font-size': 12},
+                                                   ),
+                                            html.Small("STATUS", className="text-success", id='qual0',
+                                                       style={'font-size': 11},
+                                                       ),
                                         ],
                                         className="d-flex w-100 justify-content-between",
                                     ),
-                                    html.P("number of interval : 0", className="mb-1", id='n_itv1'),
-                                    html.Small("latest.", className="text-muted"),
+                                    html.P("number of interval : 0", className="mb-1", id='n_itv1',
+                                           style={'font-size': 12},
+                                           ),
+                                    html.Small("current score.", className="text-muted",
+                                               style={'font-size': 12},
+                                               ),
                                 ]
                             ),
                         dbc.ListGroupItem([
                                     html.Div(
                                         [
-                                            html.P("RMSE : 0", className="mb-1",id='rmse2'),
-                                            html.Small("Yay!", className="text-success", id='qual1'),
+                                            html.P("RMSE : 0", className="mb-1",id='rmse2',
+                                                   style={'font-size': 12},
+                                                   ),
+                                            html.Small("STATUS", className="text-success", id='qual1',
+                                                       style={'font-size': 11},
+                                                       ),
                                         ],
                                         className="d-flex w-100 justify-content-between",
                                     ),
-                                    html.P("number of interval : 0", className="mb-1", id='n_itv2'),
-                                    html.Small("10 minutes ago.", className="text-muted"),
+                                    html.P("number of interval : 0", className="mb-1", id='n_itv2',
+                                           style={'font-size': 12},
+                                           ),
+                                    html.Small("previous RMSE score.", className="text-muted",
+                                               style={'font-size': 12},
+                                               ),
                                 ]
                             ),
                         ],
                         className="list-group-item list-group-item-action flex-column align-items-start active",
-                        )
+                        ),
+                    html.Br(),
+                    html.Small("The STATUS is shown by comparing the current score with the previous RMSE score.", className="form-label mt-4",
+                                                       style={'font-size': 10},
+                                                       ),
                         ], width = 4 ,
                             style={
                             'margin': '10px',
@@ -207,7 +240,8 @@ app.layout = dbc.Container([
                             # 'background-color':'rgb(255, 99, 71)',
                             }
                 ),
-                html.Br(), html.Br(),
+                # html.Br(), # after details below the graph
+                dcc.Store(id='storage-info', storage_type='memory'),
                 ])
             ])
     ], 
@@ -232,6 +266,29 @@ style={
 
 
 @app.callback(
+    Output("text_compute", "children"), 
+    [
+        Input("input1", "value"),
+    ]
+)
+def num_window(n):
+    if n is None:
+        raise dash.exceptions.PreventUpdate
+    elif 0 <= n < ( 60 ) :
+        windw = int( n )
+        return "RMSE score will compute every {b} seconds".format(b=(windw%60))
+    elif 0 <= n < ( 60*60 ) :
+        windw = int( n )
+        return "RMSE score will compute every {a} minutes {b} seconds".format(a=windw//60,b=(windw%60))
+    elif ( 60*60 ) <= n :
+        windw = int( n )
+        return "RMSE score will compute every {c} hours {a} minutes {b} seconds".format(a=(windw%(60*60))//(60),
+                                                                                        b=(windw%60),
+                                                                                        c=(windw//(60*60)))
+    else :
+        raise dash.exceptions.PreventUpdate
+
+@app.callback(
     Output("coin", "children"), [Input("choice0", "value")]
 )
 def on_button_click(n):
@@ -243,21 +300,20 @@ def on_button_click(n):
 @app.callback(
     Output("cardhead", "children"),
     Output("main-interval", "children"),
-    Output("n_itv1", "children"),
-    Output("n_itv2", "children"),
     Output("storage-df", "data"),
     Output('interval', 'max_intervals'),
+    Output("storage-info", "data"),
     [
         Input("choice0", "value"),
         Input('interval', 'n_intervals'),
+        Input("input1", "value"),
      ]
 )
-def on_button_click(coin, interval):
+def on_button_click(coin, interval, windw):
+
+    metric = utils.Rolling(metrics.RMSE(), window_size=windw)
     
-    if coin is None :
-        max_intervals = 0
-        # raise dash.exceptions.PreventUpdate
-    else:
+    if (windw is not None) and (windw != 0) and (coin is not None) :
         max_intervals = -1
         key = "https://api.binance.com/api/v3/ticker?symbol="+coin
         data = requests.get(key).json()
@@ -268,21 +324,38 @@ def on_button_click(coin, interval):
         y_pred = model.predict_one(times)
         model.learn_one(times, price)
 
-        # Update the error metric
-        metric.update(price, y_pred)
+        sc_interval = 0
+        rmse = 'x'
 
         my_datetime = dt.datetime.fromtimestamp(data['closeTime'] / 1000)
 
-        if (y_pred != 0) :
+        if (y_pred != 0) and ((interval % windw) != 0 ) :
             df[coin]['datetime'].append(my_datetime)
             df[coin]['price'].append(price)
             df[coin]['predicted'].append(y_pred)
-            df[coin]['rmse'].append(0)
-        else : 
-            # raise dash.exceptions.PreventUpdate
-            pass
 
-    return f'{coin}', f'count : {interval}', f'number of interval : {interval}', f'number of interval : {interval-1}', df , max_intervals
+        elif (y_pred != 0) and ((interval % windw) == 0 ) :
+            n_df = len(df[coin]['price'])
+            for i in range(n_df-windw,) :
+                # Update the error metric
+                rmse = metric.update(df[coin]['price'][i], df[coin]['predicted'][i]).get()
+
+            sc_interval = interval
+            
+            df[coin]['datetime'].append(my_datetime)
+            df[coin]['price'].append(price)
+            df[coin]['predicted'].append(y_pred)
+        
+        info = [f'number of interval : {sc_interval}', f'number of interval : {sc_interval-windw}', rmse]
+
+    else :
+        coin = '<COIN>'
+        max_intervals = 0
+        sc_interval = 0
+        info = None
+        windw = 0
+
+    return f'  💸  Processing {coin} predictions in real time', f'count : {interval}', df , max_intervals, info
 
 @app.callback(
     Output("graph", "figure"), 
@@ -293,27 +366,58 @@ def on_button_click(coin, interval):
      ]
 )
 def on_button_click(max_intervals, df, coin):
-    if ((coin is None) or (df is None)) or (max_intervals == 0):
+    if ( (coin is None) or (df is None) ) or (max_intervals == 0):
         raise dash.exceptions.PreventUpdate
     elif (max_intervals == -1) :
         df = pd.DataFrame( data = df[coin] )
+        if len(df) >= (16*60) :
+            df = df.iloc[ (len(df)-(16*60)):,: ]
 
         df = [
             go.Scatter(
                 x=df['datetime'],
                 y=df['price'],
                 name='price',
-                mode= 'lines+markers',
+                mode= 'lines',
             ),
             go.Scatter(
                 x=df['datetime'],
                 y=df['predicted'],
                 name='predicted',
-                mode= 'lines+markers'
+                mode= 'lines'
             ),
             ]
 
     return {'data': df, "layout": {"title": {"text": coin}} }
+
+@app.callback(
+    Output("n_itv1", "children"), 
+    Output("n_itv2", "children"), 
+    Output("rmse1", "children"),
+    Output("rmse2", "children"),
+    Output("qual0", "children"),
+    Output("qual0", "className"),
+    Output("qual1", "children"),
+    Output("qual1", "className"),
+    [
+        Input('storage-info', 'data'),
+        Input("rmse1", "children"),
+        Input("qual0", "children"),
+        Input("qual0", "className"),
+     ]
+)
+def info_update(info, old_rmse, o_tag, o_tag_col):
+    if (info is not None) and (info[2] != 'x') :
+        rmse = info[2]
+        p_rmse = float(old_rmse[7:])
+
+        if p_rmse < rmse : tag1 = '  performance drop!  '; tag1_color = 'text-danger'
+        elif p_rmse > rmse : tag1 = '  performance gains!  '; tag1_color = 'text-success'
+        elif p_rmse == rmse : tag1 = '  neutral..  '; tag1_color = 'text-info'
+
+        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col
+    else :
+        raise dash.exceptions.PreventUpdate
 
 if __name__ == '__main__':
     app.run(debug=True)
