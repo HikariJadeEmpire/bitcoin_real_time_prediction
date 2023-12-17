@@ -26,5 +26,5 @@ code : <br>
 
 [![](https://img.shields.io/badge/Git-.py-rgb(208,211,212)?style=f?style=flat-square&logo=github&logoColor=white)](https://github.com/HikariJadeEmpire/bitcoin_real_time_prediction/blob/main/predict_app/main.py)
 
-Algorithm : SNARIMA
-data type : ```time series```
+Algorithm : SNARIMA <br>
+data type : ```time series``` <br>
