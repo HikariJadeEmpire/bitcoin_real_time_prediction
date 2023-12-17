@@ -12,6 +12,19 @@
 
 <br>
 
+## Usage
+
+- clone this repo
+- set current directory to ```this_repo/predict_app```
+- run ```docker build -t bitcoin:0 .```
+- run ```docker run --name bitcoin -d -p 8080:8080 bitcoin:0```
+- open your browser and type ```localhost:8080```
+
 ## Details
 
-details
+code : <br>
+
+[![](https://img.shields.io/badge/Git-.py-rgb(208,211,212)?style=f?style=flat-square&logo=github&logoColor=white)](https://github.com/HikariJadeEmpire/bitcoin_real_time_prediction/blob/main/predict_app/main.py)
+
+Algorithm : SNARIMA
+data type : ```time series```
