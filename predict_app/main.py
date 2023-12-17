@@ -527,7 +527,11 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
 
         av_rmse.append(rmse)
         
-        m_rmse = mean(av_rmse)
+        if (len(av_rmse) > (60*60) ) :
+            av_rmse = av_rmse[( len(av_rmse) - (60*60) ):]
+            m_rmse = mean(av_rmse)
+        elif (len(av_rmse) <= (60*60) ) :
+            m_rmse = mean(av_rmse)
 
         if p_rmse < rmse : tag1 = '  performance drop!  '; tag1_color = 'text-danger'
         elif p_rmse > rmse : tag1 = '  performance gains!  '; tag1_color = 'text-success'
