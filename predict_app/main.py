@@ -407,10 +407,10 @@ def price_prediction(coin, interval, windw):
         pred = model.forecast(horizon=60)
         y_pred = ( pred )[0]
 
-        if (1000*price) <= (pred[-1]) :
+        if (100*price) <= (pred[-1]) :
             decision = 999999
         elif (pred[-1]) <= 0 :
-            decision = 0
+            decision = -1
         else :
             decision = ( pred )[-1]
 
@@ -533,8 +533,8 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
         elif p_rmse > rmse : tag1 = '  performance gains!  '; tag1_color = 'text-success'
         elif p_rmse == rmse : tag1 = '  neutral..  '; tag1_color = 'text-info'
 
-        if m_rmse < o_av_rmse : tag2 = f'  better! ( - {(o_av_rmse-m_rmse):.4f} )  '; tag2_color = 'text-success'
-        elif m_rmse > o_av_rmse : tag2 = f'  worse! ( + {(m_rmse-o_av_rmse):.4f} )  '; tag2_color = 'text-danger'
+        if m_rmse < o_av_rmse : tag2 = f'  better! ( - {round(o_av_rmse-m_rmse,4):,} )  '; tag2_color = 'text-success'
+        elif m_rmse > o_av_rmse : tag2 = f'  worse! ( + {round(m_rmse-o_av_rmse,4):,} )  '; tag2_color = 'text-danger'
         elif m_rmse == o_av_rmse : tag2 = '  neutral..  '; tag2_color = 'text-info'
 
         dcs = info[4]
@@ -542,7 +542,7 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
         elif decision == dcs : dcs = "HOLD"
         elif decision < dcs : dcs = "SELL"
 
-        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col, f"{m_rmse:.4f}", tag2, tag2_color, o_av_rmse_mssg, dcs, f"the price will meet : {decision:.4f} , at {info[5]}"
+        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col, f"{m_rmse:.4f}", tag2, tag2_color, o_av_rmse_mssg, dcs, f"the price will meet : {round(decision,2):,} , at {info[5]}"
     else :
         raise dash.exceptions.PreventUpdate
 
