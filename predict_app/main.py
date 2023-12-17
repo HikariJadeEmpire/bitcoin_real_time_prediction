@@ -407,7 +407,12 @@ def price_prediction(coin, interval, windw):
         pred = model.forecast(horizon=60)
         y_pred = ( pred )[0]
 
-        decision = ( pred )[-1]
+        if (1000*price) <= (pred[-1]) :
+            decision = 999999
+        elif (pred[-1]) <= 0 :
+            decision = 0
+        else :
+            decision = ( pred )[-1]
 
         sc_interval = 0
         rmse = 'x'
@@ -423,7 +428,8 @@ def price_prediction(coin, interval, windw):
             n_df = len(df[coin]['price'])
             for i in range(n_df-windw,) :
                 # Update the error metric
-                rmse = metric.update(df[coin]['price'][i], df[coin]['predicted'][i]).get()
+                metric.update(df[coin]['price'][i], df[coin]['predicted'][i])
+                rmse = float(str(metric)[5:].strip(' ').replace(',',''))
 
             sc_interval = interval
             
@@ -529,7 +535,7 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
 
         if m_rmse < o_av_rmse : tag2 = f'  better! ( - {(o_av_rmse-m_rmse):.4f} )  '; tag2_color = 'text-success'
         elif m_rmse > o_av_rmse : tag2 = f'  worse! ( + {(m_rmse-o_av_rmse):.4f} )  '; tag2_color = 'text-danger'
-        elif m_rmse == o_av_rmse : tag2 = '  performance drop!  '; tag2_color = 'text-info'
+        elif m_rmse == o_av_rmse : tag2 = '  neutral..  '; tag2_color = 'text-info'
 
         dcs = info[4]
         if decision > dcs : dcs = "BUY"
@@ -541,4 +547,4 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
         raise dash.exceptions.PreventUpdate
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=8080)
