@@ -15,7 +15,7 @@ import datetime as dt
 import math
 import pandas as pd
 
-from river import metrics, utils, compose, linear_model, preprocessing, optim
+from river import metrics, utils, compose, linear_model, preprocessing, optim, time_series
 
 def get_month(x):
     return {
@@ -30,6 +30,8 @@ def get_month_distances(x):
         calendar.month_name[month]: math.exp(-(dt.datetime.fromtimestamp(x/1000.0).month - month) ** 2)
         for month in range(1, 13)
     }
+def mean(lst):
+    return sum(lst) / len(lst)
 
 fig = dict(
     data=[{'x': [], 'y': []}], 
@@ -39,24 +41,37 @@ fig = dict(
         )
     )
 
-model = compose.Pipeline(
-    ('features', compose.TransformerUnion(
-        ('ordinal_date', compose.FuncTransformer(get_ordinal_date)),
-        ('month', compose.FuncTransformer(get_month_distances)),
+extract_features = compose.TransformerUnion(
+    get_ordinal_date,
+    get_month_distances
+)
+model = (
+    extract_features |
+    time_series.SNARIMAX(
+        p=5,
+        d=0,
+        q=0,
+        m=12,
+        sp=3,
+        sq=6,
+        regressor=(
+            preprocessing.StandardScaler() |
+            linear_model.LinearRegression(
+                intercept_init=110,
+                optimizer=optim.SGD(0.01),
+                intercept_lr=0.3
+            )
         )
-    ),
-    ('scale', preprocessing.StandardScaler()),
-    ('lin_reg', linear_model.LinearRegression(
-        intercept_lr=0,
-        optimizer=optim.SGD(0.02)
-    ))
+    )
 )
 
-model = preprocessing.TargetStandardScaler(regressor=model)
+# model = preprocessing.TargetStandardScaler(regressor=model)
+
 df = {
     'ETHUSDT':{'datetime':[], 'price':[], 'predicted':[]},
     'BTCUSDT':{'datetime':[], 'price':[], 'predicted':[]},
       }
+av_rmse = []
 
 app = Dash(
     title='BITCOIN PRED',
@@ -158,14 +173,14 @@ app.layout = dbc.Container([
                     html.Br(), html.Br(),
                     html.Span("current interval ( seconds )", 
                             className="form-label mt-4",
-                            style={'font-size': 12}
+                            style={'font-size': 8}
                             ),
                     html.Br(), html.Br(),
                     dbc.Badge("count : 0", 
                                     #  color="white",
                                     #  text_color="warning" ,
                                      className="btn btn-secondary disabled", id='main-interval'),
-                        ], width = 4 ,
+                        ], width = 2 ,
                             style={
                             'textAlign': 'center',
                             'align-items': 'center',
@@ -183,7 +198,7 @@ app.layout = dbc.Container([
                                             html.P("RMSE : 0", className="mb-1",id='rmse1',
                                                    style={'font-size': 12},
                                                    ),
-                                            html.Small("STATUS", className="text-success", id='qual0',
+                                            html.Small("status", className="text-success", id='qual0',
                                                        style={'font-size': 11},
                                                        ),
                                         ],
@@ -203,7 +218,7 @@ app.layout = dbc.Container([
                                             html.P("RMSE : 0", className="mb-1",id='rmse2',
                                                    style={'font-size': 12},
                                                    ),
-                                            html.Small("STATUS", className="text-success", id='qual1',
+                                            html.Small("status", className="text-success", id='qual1',
                                                        style={'font-size': 11},
                                                        ),
                                         ],
@@ -224,13 +239,78 @@ app.layout = dbc.Container([
                     html.Small("The STATUS is shown by comparing the current score with the previous RMSE score.", className="form-label mt-4",
                                                        style={'font-size': 10},
                                                        ),
-                        ], width = 4 ,
+                        ], width = 3 ,
                             style={
                             'margin': '10px',
                             'border-radius': '10px',
                             # 'background-color':'rgb(255, 99, 71)',
                             },
                     ),
+                dbc.Col([
+                    dbc.Badge("Average RMSE", 
+                                    #  color="white",
+                                    #  text_color="warning" ,
+                                     className="btn btn-secondary disabled"),
+                    html.Br(), html.Br(),
+                    html.Span("computed average RMSE from the beginning", 
+                            className="form-label mt-4",
+                            style={'font-size': 10}
+                            ),
+                    html.Br(), html.Br(),
+                    dbc.Badge("0", 
+                                    #  color="white",
+                                    #  text_color="warning" ,
+                                     className="btn btn-secondary disabled", id='av-rmse'),
+                    html.Br(), html.Br(),
+                    html.Small("status", className="text-success", id='av-rmse-q',
+                                    style={'font-size': 11},
+                                    ),
+                    html.Br(),
+                    html.Small("previous status", className="text-body-tertiary", id='av-rmse-q1',
+                                    style={'font-size': 11},
+                                    ),
+                        ], width = 3 ,
+                            style={
+                            'textAlign': 'center',
+                            'align-items': 'center',
+                            'margin': '10px',
+                            'border-radius': '10px',
+                            # 'background-color':'rgb(255, 99, 71)',
+                            },
+                        ),
+                dbc.Col([
+                    html.Br(), html.Br(),
+                    dbc.Badge("Recommendation", 
+                                    #  color="white",
+                                    #  text_color="warning" ,
+                                     className="btn btn-secondary disabled"),
+                    html.Br(), html.Br(),
+                    html.Span("we recommend you to ...", 
+                            className="form-label mt-4",
+                            style={'font-size': 10}
+                            ),
+                    html.Br(), html.Br(),
+                    dbc.Badge("HOLD", 
+                                    #  color="white",
+                                    #  text_color="warning" ,
+                                     className="btn btn-secondary", id='decision'),
+                    html.Br(), html.Br(),
+                    html.Small("at : 0", className="text-body-tertiary", id='decision1',
+                                    style={'font-size': 11},
+                                    ),
+                    html.Br(), html.Br(),
+                    html.Small("or in the next 1 minutes from current RMSE interval", className="text-body-tertiary", id='decision2',
+                                    style={'font-size': 11},
+                                    ),
+                        ], width = 2 ,
+                            style={
+                            'textAlign': 'center',
+                            'align-items': 'center',
+                            'margin': '10px',
+                            'border-radius': '10px',
+                            # 'background-color':'rgb(255, 99, 71)',
+                            },
+                        ),
                 ], 
                     style={
                             'textAlign': 'center',
@@ -291,7 +371,7 @@ def num_window(n):
 @app.callback(
     Output("coin", "children"), [Input("choice0", "value")]
 )
-def on_button_click(n):
+def coin_selection(n):
     if n is None:
         return "NONE"
     else:
@@ -309,7 +389,7 @@ def on_button_click(n):
         Input("input1", "value"),
      ]
 )
-def on_button_click(coin, interval, windw):
+def price_prediction(coin, interval, windw):
 
     metric = utils.Rolling(metrics.RMSE(), window_size=windw)
     
@@ -321,20 +401,25 @@ def on_button_click(coin, interval, windw):
         price = float(data['lastPrice']) # price
         times = float(data['closeTime']) # timestamp
 
-        y_pred = model.predict_one(times)
         model.learn_one(times, price)
+        # y_pred = model.predict_one(times)
+
+        pred = model.forecast(horizon=60)
+        y_pred = ( pred )[0]
+
+        decision = ( pred )[-1]
 
         sc_interval = 0
         rmse = 'x'
 
         my_datetime = dt.datetime.fromtimestamp(data['closeTime'] / 1000)
 
-        if (y_pred != 0) and ((interval % windw) != 0 ) :
+        if ((interval % windw) != 0 ) :
             df[coin]['datetime'].append(my_datetime)
             df[coin]['price'].append(price)
             df[coin]['predicted'].append(y_pred)
 
-        elif (y_pred != 0) and ((interval % windw) == 0 ) :
+        elif ((interval % windw) == 0 ) :
             n_df = len(df[coin]['price'])
             for i in range(n_df-windw,) :
                 # Update the error metric
@@ -346,7 +431,14 @@ def on_button_click(coin, interval, windw):
             df[coin]['price'].append(price)
             df[coin]['predicted'].append(y_pred)
         
-        info = [f'number of interval : {sc_interval}', f'number of interval : {sc_interval-windw}', rmse]
+        info = [
+            f'number of interval : {sc_interval}', 
+            f'number of interval : {sc_interval-windw}', 
+            rmse, 
+            decision,
+            price,
+            f'number of interval : {sc_interval+60}',
+                ]
 
     else :
         coin = '<COIN>'
@@ -365,13 +457,15 @@ def on_button_click(coin, interval, windw):
         Input("choice0", "value"),
      ]
 )
-def on_button_click(max_intervals, df, coin):
+def plot_graph(max_intervals, df, coin):
     if ( (coin is None) or (df is None) ) or (max_intervals == 0):
         raise dash.exceptions.PreventUpdate
     elif (max_intervals == -1) :
         df = pd.DataFrame( data = df[coin] )
         if len(df) >= (16*60) :
             df = df.iloc[ (len(df)-(16*60)):,: ]
+        elif ( 45 <= len(df) < (16*60) ) :
+            df = df.iloc[ 15:,: ]
 
         df = [
             go.Scatter(
@@ -392,30 +486,57 @@ def on_button_click(max_intervals, df, coin):
 
 @app.callback(
     Output("n_itv1", "children"), 
-    Output("n_itv2", "children"), 
+    Output("n_itv2", "children"),
+
     Output("rmse1", "children"),
     Output("rmse2", "children"),
+
     Output("qual0", "children"),
     Output("qual0", "className"),
     Output("qual1", "children"),
     Output("qual1", "className"),
+
+    Output("av-rmse", "children"),
+    Output("av-rmse-q", "children"),
+    Output("av-rmse-q", "className"),
+
+    Output("av-rmse-q1", "children"),
+    Output("decision", "children"),
+    Output("decision1", "children"),
     [
         Input('storage-info', 'data'),
         Input("rmse1", "children"),
         Input("qual0", "children"),
         Input("qual0", "className"),
+        Input("av-rmse", "children"),
+        Input("av-rmse-q", "children"),
      ]
 )
-def info_update(info, old_rmse, o_tag, o_tag_col):
+def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
     if (info is not None) and (info[2] != 'x') :
         rmse = info[2]
+        decision = info[3]
         p_rmse = float(old_rmse[7:])
+        o_av_rmse = float(o_av_rmse[:])
+
+        av_rmse.append(rmse)
+        
+        m_rmse = mean(av_rmse)
 
         if p_rmse < rmse : tag1 = '  performance drop!  '; tag1_color = 'text-danger'
         elif p_rmse > rmse : tag1 = '  performance gains!  '; tag1_color = 'text-success'
         elif p_rmse == rmse : tag1 = '  neutral..  '; tag1_color = 'text-info'
 
-        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col
+        if m_rmse < o_av_rmse : tag2 = f'  better! ( - {(o_av_rmse-m_rmse):.4f} )  '; tag2_color = 'text-success'
+        elif m_rmse > o_av_rmse : tag2 = f'  worse! ( + {(m_rmse-o_av_rmse):.4f} )  '; tag2_color = 'text-danger'
+        elif m_rmse == o_av_rmse : tag2 = '  performance drop!  '; tag2_color = 'text-info'
+
+        dcs = info[4]
+        if decision > dcs : dcs = "BUY"
+        elif decision == dcs : dcs = "HOLD"
+        elif decision < dcs : dcs = "SELL"
+
+        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col, f"{m_rmse:.4f}", tag2, tag2_color, o_av_rmse_mssg, dcs, f"the price will meet : {decision:.4f} , at {info[5]}"
     else :
         raise dash.exceptions.PreventUpdate
 
