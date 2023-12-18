@@ -71,7 +71,6 @@ df = {
     'ETHUSDT':{'datetime':[], 'price':[], 'predicted':[]},
     'BTCUSDT':{'datetime':[], 'price':[], 'predicted':[]},
       }
-av_rmse = []
 
 app = Dash(
     title='BITCOIN PRED',
@@ -252,7 +251,7 @@ app.layout = dbc.Container([
                                     #  text_color="warning" ,
                                      className="btn btn-secondary disabled"),
                     html.Br(), html.Br(),
-                    html.Span("computed average RMSE from the beginning", 
+                    html.Span("Calculate average RMSE over 1 hour.", 
                             className="form-label mt-4",
                             style={'font-size': 10}
                             ),
@@ -322,6 +321,7 @@ app.layout = dbc.Container([
                 ),
                 # html.Br(), # after details below the graph
                 dcc.Store(id='storage-info', storage_type='memory'),
+                dcc.Store(data=[], id='storage-av-rmse', storage_type='memory'),
                 ])
             ])
     ], 
@@ -509,6 +509,7 @@ def plot_graph(max_intervals, df, coin):
     Output("av-rmse-q1", "children"),
     Output("decision", "children"),
     Output("decision1", "children"),
+    Output("storage-av-rmse", "data"),
     [
         Input('storage-info', 'data'),
         Input("rmse1", "children"),
@@ -516,9 +517,10 @@ def plot_graph(max_intervals, df, coin):
         Input("qual0", "className"),
         Input("av-rmse", "children"),
         Input("av-rmse-q", "children"),
+        Input("storage-av-rmse", "data"),
      ]
 )
-def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
+def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg, av_rmse):
     if (info is not None) and (info[2] != 'x') :
         rmse = info[2]
         decision = info[3]
@@ -546,7 +548,7 @@ def info_update(info, old_rmse, o_tag, o_tag_col, o_av_rmse, o_av_rmse_mssg):
         elif decision == dcs : dcs = "HOLD"
         elif decision < dcs : dcs = "SELL"
 
-        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col, f"{m_rmse:.4f}", tag2, tag2_color, o_av_rmse_mssg, dcs, f"the price will meet : {round(decision,2):,} , at {info[5]}"
+        return info[0], info[1], f'RMSE : {rmse:.6f}', old_rmse, tag1, tag1_color, o_tag, o_tag_col, f"{m_rmse:.4f}", tag2, tag2_color, o_av_rmse_mssg, dcs, f"the price will meet : {round(decision,2):,} , at {info[5]}", av_rmse
     else :
         raise dash.exceptions.PreventUpdate
 
