@@ -20,6 +20,11 @@
 - run ```docker run --name bitcoin -d -p 8080:8080 bitcoin:0```
 - open your browser and type ```localhost:8080```
 
+<h3>To close & delete</h3>
+
+- to close, run ```docker stop bitcoin```
+- to delete all *images & containers*, run ```docker system prune -a```
+
 ## Details
 
 code : <br>
