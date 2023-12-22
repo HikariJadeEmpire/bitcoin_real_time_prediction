@@ -33,3 +33,5 @@ code : <br>
 
 Algorithm : SNARIMA <br>
 data type : ```time series``` <br>
+evaluation : Root Mean Squared Error (RMSE) score <br>
+recommendation feature details : The recommendation feature works best when the RMSE score is at its lowest. *(e.g. 0.001)*
